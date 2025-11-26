@@ -141,42 +141,46 @@ float GetWordWidth(const char *Word)
 void ReadWord(FILE *pTestDataFile, float FontSize)
 {
     char Word[MaxWordLength];
-    int index = 0;
-    int c;
+    int WordIndex = 0;
+    int CurrentCharacter;
 
-    while ((c = fgetc(pTestDataFile)) != EOF)
+    while ((CurrentCharacter = fgetc(pTestDataFile)) != EOF)
     {
-        if (c == ' ' || c == '\t' || c == 10 || c == 13)
+        if (CurrentCharacter == ' ' || CurrentCharacter == '\t' || CurrentCharacter == 10 || CurrentCharacter == 13)
         {
-            if (index > 0)
+            if (WordIndex > 0)
             {
-                Word[index] = '\0';
+                Word[WordIndex] = '\0';
 
                 if (XOffset + GetWordWidth(Word) > LineLength)
+                {
                     SetNewLine(FontSize);
-
+                }
                 GenerateGCode(Word);
-                index = 0;
+
+                WordIndex = 0;
             }
 
-            if (c == ' ' || c == '\t')
+            if (CurrentCharacter == ' ')
             {
                 XOffset += FontSize; // Edit to space ascii
             }
 
-            if (c == 10 || c == 13)
+            if (CurrentCharacter == 10 || CurrentCharacter == 13)
                 SetNewLine(FontSize);
 
             continue;
         }
 
-        if (index < MaxWordLength - 1)
-            Word[index++] = (char)c;
+        if (WordIndex < MaxWordLength - 1)
+        {
+            Word[WordIndex++] = (char)CurrentCharacter;
+        }
     }
 
-    if (index > 0) // Final Word in input file
+    if (WordIndex > 0) // Final Word in input file
     {
-        Word[index] = '\0';
+        Word[WordIndex] = '\0';
         if (XOffset + GetWordWidth(Word) > LineLength)
         {
             SetNewLine(FontSize);
