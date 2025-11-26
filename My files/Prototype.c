@@ -1,121 +1,226 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-// FONT DATA STRUCTS //
+#define MaxAscii 128
+#define MaxWordLength 100
+#define LineLength 100
+#define LineSpacing 5.0
 
-typedef struct // Creates a struct to hold stroke information
+typedef struct
 {
-    float x, y, pen; // Creates a float value to hold the x, y and pen data for each position for a character
-} Strokes;           // Creates an alias to allow the struct to be called without typing "struct" each time
+    float X, Y;
+    int Pen;
+} Strokes;
 
-typedef struct // Creates a struct to hold character information
+typedef struct
 {
-    int ascii;         // Holds the ascii value of each character
-    int StrokeCount;   // Holds the stroke count of each letter
-    Strokes *pStrokes; // Points to the 'Strokes' struct to allow data to be put there
+    int ascii;
+    int StrokeCount;
+    Strokes *pStrokes;
 } Character;
 
-// FUNCTION DECLARATIONS //
+Character *FontArray = NULL;
+float XOffset = 0.0, YOffset = 0.0, ScaleFactor = 0.0;
 
 int LoadFontData(void);
-int GetFontSize(void);
-float CalculateScaleFactor(int FontSize);
-int ReadWord(void);
-int NewLineChecker(const char *Word);
-void SetNewLine(void);
-void GenerateGCode(const char *Word);
-int NewWordChecker(FILE *pFontDataFile);
+float GetFontSize(void);
+float CalculateScaleFactor(float FontSize);
+float GetWordWidth(const char *Word);
+void ReadWord(FILE *pTestDataFile, float FontSize);
+void GenerateGCode(const char *Word, float FontSize);
+void SetNewLine(float FontSize);
+void FreeFontData(void);
 
 int main(void)
 {
-    printf("RobotWriter Program - Callum O'Neill 20576144\n\n"); // Prints the project title
+    printf("RobotWriter Program - Callum O'Neill\n\n");
 
-    LoadFontData(); // Calls the 'LoadFontData' function
+    if (LoadFontData() != 0)
+        return -1;
 
-    int FontSize = GetFontSize(); // Stores the return value 'FontSize' as an int with the same name
+    float FontSize = GetFontSize();
+    ScaleFactor = CalculateScaleFactor(FontSize);
 
-    float ScaleFactor = CalculateScaleFactor(FontSize);
+    FILE *pTestDataFile = fopen("TestData.txt", "r");
+    if (!pTestDataFile)
+    {
+        printf("Could not open TestData.txt\n");
+        return -1;
+    }
+
+    ReadWord(pTestDataFile, FontSize);
+
+    fclose(pTestDataFile);
+
+    FreeFontData();
+
+    return 0;
 }
 
 int LoadFontData(void)
 {
-    FILE *pFontDataFile = fopen("SingleStrokeFont.txt", "r"); // Creates a file pointer to point to the font data file
-
-    if (pFontDataFile == NULL) // Checks if the pointer doesn't have an address of the file
+    FILE *pSingleStrokeFont = fopen("SingleStrokeFont.txt", "r");
+    if (!pSingleStrokeFont)
     {
-        printf("The file could not be opened\n\n"); // Prints an error message
-        return -1;                                  // Returns error value
+        printf("Could not open SingleStrokeFont.txt\n");
+        return -1;
     }
 
-    Character *pCharacter;                       // Creaates a pointer to the struct 'Letter'
-    pCharacter = calloc(128, sizeof(Character)); // Allocates the space needed for all
+    FontArray = calloc(MaxAscii, sizeof(Character));
+    int Marker, ascii, StrokeCount;
 
-    int Marker, ascii, StrokeCount; // Creates an int for the 3 variables
-
-    while (fscanf(pFontDataFile, "%d", &Marker) == 1) // Scans every word in the font data file
+    while (fscanf(pSingleStrokeFont, "%d", &Marker) == 1)
     {
-        if (Marker == 999) // Checks for the new word marker '999'
+        if (Marker == 999)
         {
-            fscanf(pFontDataFile, " %d %d", &ascii, &StrokeCount);              // Loads the ascii and stroke count data
-            pCharacter[ascii].ascii = ascii;                                    // Stores the ascii value for the specific letter
-            pCharacter[ascii].StrokeCount = StrokeCount;                        // Stores the stroke counr for the specific letter
-            pCharacter[ascii].pStrokes = malloc(sizeof(Strokes) * StrokeCount); // Allocates enough memory needed for each letter depending of it's amount of strokes
+            fscanf(pSingleStrokeFont, "%d %d", &ascii, &StrokeCount);
+            FontArray[ascii].ascii = ascii;
+            FontArray[ascii].StrokeCount = StrokeCount;
+            FontArray[ascii].pStrokes = malloc(sizeof(Strokes) * StrokeCount);
 
-            for (int i = 0; i < StrokeCount; i++) // Iterates through all strokes for each character
+            for (int i = 0; i < StrokeCount; i++)
             {
-                fscanf(pFontDataFile, " %f %f %f",          // Scans the x, y, and pen data
-                       &pCharacter[ascii].pStrokes[i].x,    // Stores the x data for the specific stroke
-                       &pCharacter[ascii].pStrokes[i].y,    // Stores the y data for the specific stroke
-                       &pCharacter[ascii].pStrokes[i].pen); // Stores the pen data for the specific stroke
+                fscanf(pSingleStrokeFont, "%f %f %d",
+                       &FontArray[ascii].pStrokes[i].X,
+                       &FontArray[ascii].pStrokes[i].Y,
+                       &FontArray[ascii].pStrokes[i].Pen);
             }
         }
     }
 
-    fclose(pFontDataFile); // Closes the file
-    return 0;              // Returns success value
+    fclose(pSingleStrokeFont);
+    return 0;
 }
 
-int GetFontSize(void)
+float GetFontSize(void)
 {
-    int FontSize;
-    while (1) // Repeats until a value is returned
+    float FontSize;
+    while (1)
     {
-        // Creates an int to store the font size
-        printf("Enter an integer font size between 4 and 10:\n\n"); // Prompts the user for a font size
-        scanf("%d", &FontSize);                                     // Stores the users input as 'FontSize'
+        printf("Enter a font size between 4 and 10:\n\n");
+        scanf("%f", &FontSize);
 
-        if (FontSize >= 4 && FontSize <= 10) // Checks if 'FontSize' is in the given integer range
+        if (FontSize >= 4 && FontSize <= 10)
         {
-            printf("Selected font size: %d", FontSize); // Prints the font size
-            return FontSize;                            // Returns 'FontSize', breaking the while loop
+            printf("\nSelected font size: %f\n\n", FontSize);
+            return FontSize;
         }
-        else // If 'FontSize' is not a valid integer
+        else
         {
-            printf("This is an invalid font size\n\n"); // Prints error statement
-            // No return value so the while loop repeats
+            printf("\nThis is an invalid font size\n\n");
         }
     }
 }
 
-float CalculateScaleFactor(int FontSize)
+float CalculateScaleFactor(float FontSize)
 {
-    float ScaleFactor = (float)FontSize / 18.0;  // Converts 'FontSize' to a float and calculates the scale factor
-    printf("Scale factor: %f\n\n", ScaleFactor); // Prints scale factor
-    return ScaleFactor;                          // Returns 'ScaleFactor'
+    return FontSize / 18.0;
 }
 
-// int ReadWord(void)
-// {
-// }
+float GetWordWidth(const char *Word)
+{
+    float WordWidth = 0.0;
 
-// int NewLineChecker(const char *word)
-// {
-// }
+    for (int i = 0; i < strlen(Word); i++)
+    {
+        int ascii = (int)Word[i];
+        Character CurrentCharacter = FontArray[ascii];
+        if (CurrentCharacter.StrokeCount > 0)
+        {
+            float WordEnd = CurrentCharacter.pStrokes[CurrentCharacter.StrokeCount - 1].X;
+            WordWidth += WordEnd * ScaleFactor;
+        }
+    }
 
-// void SetNewLine(void)
-// {
-// }
+    return WordWidth;
+}
 
-// void GenerateGCode(const char *word)
-// {
-// }
+void ReadWord(FILE *pTestDataFile, float FontSize)
+{
+    char Word[MaxWordLength];
+    int index = 0;
+    int c;
+
+    while ((c = fgetc(pTestDataFile)) != EOF)
+    {
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r')
+        {
+            if (index > 0)
+            {
+                Word[index] = '\0';
+
+                // Wrap if word exceeds line length
+                if (XOffset + GetWordWidth(Word) > LineLength)
+                    SetNewLine(FontSize);
+
+                GenerateGCode(Word, FontSize);
+                index = 0;
+            }
+
+            // Add space: advance XOffset
+            if (c == ' ' || c == '\t')
+            {
+                XOffset += FontSize; // Or a fixed width you prefer
+            }
+
+            // Newline: move to next line
+            if (c == '\n' || c == '\r')
+                SetNewLine(FontSize);
+
+            continue;
+        }
+
+        if (index < MaxWordLength - 1)
+            Word[index++] = (char)c;
+    }
+
+    // Last word at end of file
+    if (index > 0)
+    {
+        Word[index] = '\0';
+        if (XOffset + GetWordWidth(Word) > LineLength)
+            SetNewLine(FontSize);
+        GenerateGCode(Word, FontSize);
+    }
+}
+
+void GenerateGCode(const char *Word, float FontSize)
+{
+    for (int i = 0; i < strlen(Word); i++)
+    {
+        int ascii = (int)Word[i];
+        Character CurrentCharacter = FontArray[ascii];
+
+        for (int j = 0; j < CurrentCharacter.StrokeCount; j++)
+        {
+            float X = XOffset + CurrentCharacter.pStrokes[j].X * ScaleFactor;
+            float Y = YOffset + CurrentCharacter.pStrokes[j].Y * ScaleFactor;
+            int Pen = CurrentCharacter.pStrokes[j].Pen;
+
+            if (Pen == 1)
+                printf("G1 X%.2f Y%.2f\n", X, Y);
+            else
+                printf("G0 X%.2f Y%.2f\n", X, Y);
+        }
+
+        // Move XOffset by width of this character
+        if (CurrentCharacter.StrokeCount > 0)
+        {
+            XOffset += CurrentCharacter.pStrokes[CurrentCharacter.StrokeCount - 1].X * ScaleFactor;
+        }
+    }
+}
+
+void SetNewLine(float FontSize)
+{
+    XOffset = 0.0;
+    YOffset -= (FontSize + LineSpacing);
+}
+
+void FreeFontData(void)
+{
+    for (int i = 0; i < MaxAscii; i++)
+        free(FontArray[i].pStrokes);
+    free(FontArray);
+}
