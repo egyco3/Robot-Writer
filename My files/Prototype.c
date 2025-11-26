@@ -5,7 +5,7 @@
 #define MaxAscii 128
 #define MaxWordLength 100
 #define LineLength 100
-#define LineSpacing 5.0
+#define LineSpacing 5.0f
 
 typedef struct
 {
@@ -28,7 +28,7 @@ float GetFontSize(void);
 float CalculateScaleFactor(float FontSize);
 float GetWordWidth(const char *Word);
 void ReadWord(FILE *pTestDataFile, float FontSize);
-void GenerateGCode(const char *Word, float FontSize);
+void GenerateGCode(const char *Word);
 void SetNewLine(float FontSize);
 void FreeFontData(void);
 
@@ -37,8 +37,9 @@ int main(void)
     printf("RobotWriter Program - Callum O'Neill\n\n");
 
     if (LoadFontData() != 0)
+    {
         return -1;
-
+    }
     float FontSize = GetFontSize();
     ScaleFactor = CalculateScaleFactor(FontSize);
 
@@ -77,7 +78,7 @@ int LoadFontData(void)
             fscanf(pSingleStrokeFont, "%d %d", &ascii, &StrokeCount);
             FontArray[ascii].ascii = ascii;
             FontArray[ascii].StrokeCount = StrokeCount;
-            FontArray[ascii].pStrokes = malloc(sizeof(Strokes) * StrokeCount);
+            FontArray[ascii].pStrokes = malloc((size_t)StrokeCount * sizeof(Strokes));
 
             for (int i = 0; i < StrokeCount; i++)
             {
@@ -109,20 +110,21 @@ float GetFontSize(void)
         else
         {
             printf("\nThis is an invalid font size\n\n");
+            getchar(); // Stops infinite loop because of the '\n'
         }
     }
 }
 
 float CalculateScaleFactor(float FontSize)
 {
-    return FontSize / 18.0;
+    return FontSize / 18.0f;
 }
 
 float GetWordWidth(const char *Word)
 {
     float WordWidth = 0.0;
 
-    for (int i = 0; i < strlen(Word); i++)
+    for (size_t i = 0; i < strlen(Word); i++)
     {
         int ascii = (int)Word[i];
         Character CurrentCharacter = FontArray[ascii];
@@ -144,28 +146,25 @@ void ReadWord(FILE *pTestDataFile, float FontSize)
 
     while ((c = fgetc(pTestDataFile)) != EOF)
     {
-        if (c == ' ' || c == '\t' || c == '\n' || c == '\r')
+        if (c == ' ' || c == '\t' || c == 10 || c == 13)
         {
             if (index > 0)
             {
                 Word[index] = '\0';
 
-                // Wrap if word exceeds line length
                 if (XOffset + GetWordWidth(Word) > LineLength)
                     SetNewLine(FontSize);
 
-                GenerateGCode(Word, FontSize);
+                GenerateGCode(Word);
                 index = 0;
             }
 
-            // Add space: advance XOffset
             if (c == ' ' || c == '\t')
             {
-                XOffset += FontSize; // Or a fixed width you prefer
+                XOffset += FontSize; // Edit to space ascii
             }
 
-            // Newline: move to next line
-            if (c == '\n' || c == '\r')
+            if (c == 10 || c == 13)
                 SetNewLine(FontSize);
 
             continue;
@@ -175,19 +174,20 @@ void ReadWord(FILE *pTestDataFile, float FontSize)
             Word[index++] = (char)c;
     }
 
-    // Last word at end of file
-    if (index > 0)
+    if (index > 0) // Final Word in input file
     {
         Word[index] = '\0';
         if (XOffset + GetWordWidth(Word) > LineLength)
+        {
             SetNewLine(FontSize);
-        GenerateGCode(Word, FontSize);
+            GenerateGCode(Word);
+        }
     }
 }
 
-void GenerateGCode(const char *Word, float FontSize)
+void GenerateGCode(const char *Word)
 {
-    for (int i = 0; i < strlen(Word); i++)
+    for (size_t i = 0; i < strlen(Word); i++)
     {
         int ascii = (int)Word[i];
         Character CurrentCharacter = FontArray[ascii];
@@ -199,12 +199,15 @@ void GenerateGCode(const char *Word, float FontSize)
             int Pen = CurrentCharacter.pStrokes[j].Pen;
 
             if (Pen == 1)
+            {
                 printf("G1 X%.2f Y%.2f\n", X, Y);
+            }
             else
+            {
                 printf("G0 X%.2f Y%.2f\n", X, Y);
+            }
         }
 
-        // Move XOffset by width of this character
         if (CurrentCharacter.StrokeCount > 0)
         {
             XOffset += CurrentCharacter.pStrokes[CurrentCharacter.StrokeCount - 1].X * ScaleFactor;
@@ -214,13 +217,15 @@ void GenerateGCode(const char *Word, float FontSize)
 
 void SetNewLine(float FontSize)
 {
-    XOffset = 0.0;
+    XOffset = 0.0f;
     YOffset -= (FontSize + LineSpacing);
 }
 
 void FreeFontData(void)
 {
     for (int i = 0; i < MaxAscii; i++)
+    {
         free(FontArray[i].pStrokes);
+    }
     free(FontArray);
 }
