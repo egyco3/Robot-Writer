@@ -26,8 +26,8 @@ float XOffset = 0.0, YOffset = 0.0, ScaleFactor = 0.0;
 int LoadFontData(void);
 float GetFontSize(void);
 float CalculateScaleFactor(float FontSize);
-float GetWordWidth(const char *Word);
-void ReadWord(FILE *pTestDataFile, float FontSize);
+float CalculateWordWidth(const char *Word);
+void ProcessWord(FILE *pTestDataFile, float FontSize);
 void GenerateGCode(const char *Word);
 void SetNewLine(float FontSize);
 void FreeFontData(void);
@@ -44,17 +44,23 @@ int main(void)
     ScaleFactor = CalculateScaleFactor(FontSize);
 
     FILE *pTestDataFile = fopen("TestData.txt", "r");
-    if (!pTestDataFile)
+    if (!pTestDataFile || pTestDataFile == NULL)
     {
         printf("Could not open TestData.txt\n");
         return -1;
     }
 
-    ReadWord(pTestDataFile, FontSize);
+    ProcessWord(pTestDataFile, FontSize);
+
+    printf("\nG-Code Sent.\n\n");
 
     fclose(pTestDataFile);
 
+    printf("TestData.txt closed\n\n");
+
     FreeFontData();
+
+    printf("Font data memory freed\n\n");
 
     return 0;
 }
@@ -120,7 +126,7 @@ float CalculateScaleFactor(float FontSize)
     return FontSize / 18.0f;
 }
 
-float GetWordWidth(const char *Word)
+float CalculateWordWidth(const char *Word)
 {
     float WordWidth = 0.0;
 
@@ -138,7 +144,7 @@ float GetWordWidth(const char *Word)
     return WordWidth;
 }
 
-void ReadWord(FILE *pTestDataFile, float FontSize)
+void ProcessWord(FILE *pTestDataFile, float FontSize)
 {
     char Word[MaxWordLength];
     int WordIndex = 0;
@@ -152,7 +158,7 @@ void ReadWord(FILE *pTestDataFile, float FontSize)
             {
                 Word[WordIndex] = '\0';
 
-                if (XOffset + GetWordWidth(Word) > LineLength)
+                if (XOffset + CalculateWordWidth(Word) > LineLength)
                 {
                     SetNewLine(FontSize);
                 }
@@ -181,7 +187,7 @@ void ReadWord(FILE *pTestDataFile, float FontSize)
     if (WordIndex > 0) // Final Word in input file
     {
         Word[WordIndex] = '\0';
-        if (XOffset + GetWordWidth(Word) > LineLength)
+        if (XOffset + CalculateWordWidth(Word) > LineLength)
         {
             SetNewLine(FontSize);
             GenerateGCode(Word);
