@@ -6,7 +6,7 @@
 
 // MODE OPTIONS
 
-#define TERMINAL_MODE 0 // Set to 1 for simulation mode (prints G-code to console), 0 for actual robot mode
+#define TERMINAL_MODE 1 // Set to 1 for simulation mode (prints G-code to console), 0 for actual robot mode
 
 #if TERMINAL_MODE == 0
 
@@ -299,7 +299,7 @@ void GenerateGCode(const char *Word, char *buffer)
 #if (TERMINAL_MODE == 0)
                 {
                     sprintf(buffer, "G1 X%.2f Y%.2f\n", X, Y); // G1 command for pen down
-                    // SendCommands(buffer);
+                    SendCommands(buffer);
                 }
 #endif
             }
@@ -313,7 +313,7 @@ void GenerateGCode(const char *Word, char *buffer)
 #if (TERMINAL_MODE == 0)
                 {
                     sprintf(buffer, "G0 X%.2f Y%.2f\n", X, Y); // G0 command for pen up
-                    // SendCommands(buffer);
+                    SendCommands(buffer);
                 }
 #endif
             }
