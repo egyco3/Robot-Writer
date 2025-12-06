@@ -6,7 +6,7 @@
 
 // MODE OPTIONS
 
-#define TERMINAL_MODE 0 // Set to 1 for simulation mode (prints G-code to console), 0 for actual robot mode
+#define TERMINAL_MODE 1 // Set to 1 for simulation mode (prints G-code to console), 0 for actual robot mode
 
 #if TERMINAL_MODE == 0
 
@@ -74,10 +74,10 @@ int main(void)
         return -1;
     }
 
-    char buffer[100];
-
 #if TERMINAL_MODE == 0
     // char mode[] = {'8', 'N', '1', 0};
+
+    char buffer[100];
 
     // If we cannot open the port then give up immediately
     if (CanRS232PortBeOpened() == -1)
@@ -278,7 +278,6 @@ void ProcessWord(FILE *pTestDataFile, float FontSize)
 
 void GenerateGCode(const char *Word)
 {
-    char WordBuffer[100];
     for (size_t i = 0; i < strlen(Word); i++)
     {
         int ascii = (int)Word[i];
@@ -300,6 +299,7 @@ void GenerateGCode(const char *Word)
 #endif
 #if (TERMINAL_MODE == 0)
                 {
+                    char WordBuffer[100];
                     sprintf(WordBuffer, "S1000\n");
                     SendCommands(WordBuffer);
                     sprintf(WordBuffer, "G0 X%.2f Y%.2f\n", X, Y);
