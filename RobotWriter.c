@@ -61,7 +61,7 @@ void FreeFontData(void);
 
 int main(void)
 {
-    printf("RobotWriter Program - Callum O'Neill\n\n");
+    printf("RobotWriter Program - Callum O'Neill 20576144\n\n");
 
     LoadFontData();
 
@@ -106,7 +106,7 @@ int main(void)
 
     ProcessWord(FontSize); // Processes each word in the test data file
 
-    printf("\nG-Code Sent.\n\n");
+    printf("\nG-code sent\n\n");
 
     FreeFontData(); // Frees the memory allocated for font data
 
