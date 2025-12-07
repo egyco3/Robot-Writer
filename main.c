@@ -51,9 +51,10 @@ int LoadFontData(void);
 float GetFontSize(void);
 float CalculateScaleFactor(float FontSize);
 float CalculateWordWidth(const char *Word);
-void ProcessWord(FILE *pTestDataFile, float FontSize);
+int ProcessWord(float FontSize);
 void GenerateGCode(const char *Word);
 void SetNewLine(float FontSize);
+void ResetPen(void);
 void FreeFontData(void);
 
 // FUNCTIONS
@@ -66,13 +67,6 @@ int main(void)
 
     float FontSize = GetFontSize();               // Assigns FontSize from return value
     ScaleFactor = CalculateScaleFactor(FontSize); // Calculates the scale factor based on the font size
-
-    FILE *pTestDataFile = fopen("TestData.txt", "rb"); // Creates a file pointer to the test data file
-    if (!pTestDataFile || pTestDataFile == NULL)       // Checks if the file pointer is NULL
-    {
-        printf("Could not open TestData.txt\n");
-        return -1;
-    }
 
 #if TERMINAL_MODE == 0
     // char mode[] = {'8', 'N', '1', 0};
@@ -110,13 +104,9 @@ int main(void)
 
 #endif
 
-    ProcessWord(pTestDataFile, FontSize); // Processes each word in the test data file
+    ProcessWord(FontSize); // Processes each word in the test data file
 
     printf("\nG-Code Sent.\n\n");
-
-    fclose(pTestDataFile); // Closes the test data file
-
-    printf("TestData.txt closed\n\n");
 
     FreeFontData(); // Frees the memory allocated for font data
 
@@ -144,7 +134,7 @@ int LoadFontData(void)
     {
         printf("Memory allocation failed for FontArray\n");
         fclose(pSingleStrokeFont);
-        return -1;
+        return -2;
     }
 
     int Marker, ascii, StrokeCount;
@@ -216,8 +206,15 @@ float CalculateWordWidth(const char *Word)
     return WordWidth;
 }
 
-void ProcessWord(FILE *pTestDataFile, float FontSize)
+int ProcessWord(float FontSize)
 {
+    FILE *pTestDataFile = fopen("TestData.txt", "rb"); // Creates a file pointer to the test data file
+    if (!pTestDataFile || pTestDataFile == NULL)       // Checks if the file pointer is NULL
+    {
+        printf("Could not open TestData.txt\n");
+        return -1;
+    }
+
     char Word[MaxWordLength];
     int WordIndex = 0;
     int CurrentCharacter;
@@ -274,6 +271,13 @@ void ProcessWord(FILE *pTestDataFile, float FontSize)
 
         GenerateGCode(Word);
     }
+
+    ResetPen(); // Ensures pen is reset at the end
+
+    fclose(pTestDataFile);
+
+    printf("\nTestData.txt closed\n");
+    return 0;
 }
 
 void GenerateGCode(const char *Word)
@@ -289,17 +293,19 @@ void GenerateGCode(const char *Word)
             float Y = YOffset + CurrentCharacter.pStrokes[j].Y * ScaleFactor; // Calculates the Y coordinate with the scale factor
             int Pen = CurrentCharacter.pStrokes[j].Pen;
 
+#if TERMINAL_MODE == 0
+            char WordBuffer[100];
+#endif
             if (Pen == 1)
             {
-#if (TERMINAL_MODE == 1)
+#if TERMINAL_MODE == 1
                 {
                     printf("S1000\n"); // Pen down command
                     printf("G0 X%.2f Y%.2f\n", X, Y);
                 }
 #endif
-#if (TERMINAL_MODE == 0)
+#if TERMINAL_MODE == 0
                 {
-                    char WordBuffer[100];
                     sprintf(WordBuffer, "S1000\n");
                     SendCommands(WordBuffer);
                     sprintf(WordBuffer, "G0 X%.2f Y%.2f\n", X, Y);
@@ -309,13 +315,13 @@ void GenerateGCode(const char *Word)
             }
             else
             {
-#if (TERMINAL_MODE == 1)
+#if TERMINAL_MODE == 1
                 {
                     printf("S0\n");
                     printf("G0 X%.2f Y%.2f\n", X, Y);
                 }
 #endif
-#if (TERMINAL_MODE == 0)
+#if TERMINAL_MODE == 0
                 {
                     sprintf(WordBuffer, "S0\n"); // Pen up command
                     SendCommands(WordBuffer);
@@ -337,6 +343,25 @@ void SetNewLine(float FontSize)
 {
     XOffset = 0.0f;
     YOffset -= (FontSize + LineSpacing); // Moves the YOffset down for the new line
+}
+
+void ResetPen(void)
+{
+#if TERMINAL_MODE == 1
+    {
+        printf("S0\n");       // Pen up command
+        printf("G0 X0 Y0\n"); // Move to origin
+    }
+#endif
+#if TERMINAL_MODE == 0
+    {
+        char WordBuffer[100];
+        sprintf(WordBuffer, "S0\n"); // Pen up command
+        SendCommands(WordBuffer);
+        sprintf(WordBuffer, "G0 X0 Y0\n"); // Move to origin
+        SendCommands(WordBuffer);
+    }
+#endif
 }
 
 void FreeFontData(void)
