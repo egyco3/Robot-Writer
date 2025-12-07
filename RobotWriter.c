@@ -18,7 +18,7 @@ void SendCommands(char *buffer);
 
 #endif
 
-// DEFINITIONS
+// GLOBAL CONSTANTS
 
 #define MaxAscii 128
 #define MaxWordLength 100
